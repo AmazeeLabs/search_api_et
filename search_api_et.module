@@ -1,0 +1,8 @@
+<?php
+
+/**
+ * @file
+ * Adds Entity Translation support to the Search API.
+ */
+
+
