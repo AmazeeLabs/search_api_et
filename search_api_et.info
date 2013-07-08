@@ -3,6 +3,7 @@ description = "Adds Entity Translation support to the Search API."
 package = Search
 core = "7.x"
 
+dependencies[] = field
 dependencies[] = search_api
 
 files[] = datasource.inc

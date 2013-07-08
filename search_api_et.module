@@ -14,7 +14,7 @@ function search_api_et_search_api_item_type_info() {
   $types = array();
 
   foreach (entity_get_property_info() as $type => $property_info) {
-    if ($info = entity_get_info($type)) {
+    if ($info = entity_get_info($type) && field_has_translation_handler($type)) {
       $types["search_api_et_$type"] = array(
         'name' => t('!type (multilingual)', array('!type' => $info['label'])),
         'datasource controller' => 'SearchApiEtDatasourceController',
@@ -41,16 +41,75 @@ function search_api_et_search_api_index_update(SearchApiIndex $index) {
 }
 
 /**
+ * Retrieve the Search API ET settings for a specific index.
+ *
+ * @param SearchApiIndex $index
+ *   The index whose settings should be retrieved.
+ *
+ * @return array
+ *   An associative array with the Search API ET settings for the specified
+ *   index. The settings are as follows:
+ *   - languages: All languages which should be included in the index.
+ *   - include: Determines with which languages an item should be included in
+ *     the index. Possible values are:
+ *     - all: Include items in all enabled languages, even if they don't have a
+ *       translation.
+ *     - incomplete: Include languages which have at least one translated fields
+ *       on the entity.
+ *     - complete: Only include entities for which all translatable fields have
+ *       been translated.
+ *   - fallback language: The language to be used for fields if the field isn't
+ *     available in the target language. If NULL, fields without appropriate
+ *     translations are removed.
+ */
+function search_api_et_get_index_settings(SearchApiIndex $index) {
+  $settings = isset($index->options['search_api_et']) ? $index->options['search_api_et'] : array();
+  $settings += array(
+    // @todo Use only enabled languages?
+    'languages' => array_keys(language_list()),
+    'include' => 'all',
+    'fallback language' => NULL,
+  );
+  return $settings;
+}
+
+/**
  * Determines the languages that are available for an entity in a certain index.
  *
  * @param object $entity
  *   The entity for which languages should be determined.
+ * @param string $type
+ *   The entity type of the entity.
  * @param SearchApiIndex $index
  *   The index whose settings should be used for determining the languages.
  *
  * @return array
  *   An array of language codes for the languages that are available.
  */
-function search_api_et_item_languages($entity, SearchApiIndex $index) {
-  // @todo Implement.
+function search_api_et_item_languages($entity, $type, SearchApiIndex $index) {
+  $settings = search_api_et_get_index_settings($index);
+  if ($settings['include'] == 'all') {
+    return $settings['languages'];
+  }
+  list(, , $bundle) = entity_extract_ids($type, $entity);
+  $languages = array();
+  $field_count = 0;
+  foreach (field_info_instances($type, $bundle) as $field_name => $instance) {
+    $field = field_info_field($field_name);
+    if (!empty($field['translatable']) && isset($entity->{$instance['field_name']})) {
+      ++$field_count;
+      foreach ($entity->{$instance['field_name']} as $lang => $data) {
+        $languages += array($lang => 0);
+        ++$languages[$lang];
+      }
+    }
+  }
+  if ($settings['include'] == 'complete') {
+    foreach ($languages as $lang => $count) {
+      if ($count < $field_count) {
+        unset($languages[$lang]);
+      }
+    }
+  }
+  return array_keys($languages);
 }
