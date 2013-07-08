@@ -40,7 +40,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     }
     $entities = entity_load($this->entityType, array_keys($item_languages));
 
-    // If some items couldn't be loaded, remove them from tracking.
+    // If some items could not be loaded, remove them from tracking.
     if (count($entities) != count($item_languages)) {
       $unknown = array_keys(array_diff_key($item_languages, $entities));
       if ($unknown) {
@@ -102,13 +102,45 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    * index changes, to take care of new and/or out-dated IDs.
    */
   public function startTracking(array $indexes) {
-    if (!$this->table) {
-      return;
+    // Since existing items are index-specific, we have to do this one by one.
+    // (Although in nearly all cases, this will be called with only a single
+    // index anyways.)
+    foreach ($indexes as $index) {
+      // Get all existing IDs, in case we are just updating the items, not
+      // starting fresh.
+      $sql = 'SELECT item_id FROM {' . $this->table . '} WHERE index_id = :id';
+      $existing = db_query($sql, array(':id' => $index->id));
+      $existing = $existing->fetchAllKeyed(0, 0);
+      // Get all IDs right now.
+      $all_ids = $this->getAllIndexItemIds($index);
+      // Compare the two sets in both directions to determine new and out-dated
+      // items.
+      if ($new_ids = array_diff_key($all_ids, $existing)) {
+        $this->trackItemInsert($new_ids, array($index));
+      }
+      if ($old_ids = array_diff_key($existing, $all_ids)) {
+        // We cannot use search_api_track_item_delete() here, since that would
+        // delete the item for ALL indexes with this type, for which the
+        // settings might differ. Therefore, we just extract the relevant code
+        // here.
+        // (We do not need to check for read_only, as this method will never be
+        // called for read-only indexes anyways.)
+        $this->trackItemDelete($old_ids, array($index));
+        if ($index->server) {
+          $server = $index->server();
+          if ($server->enabled) {
+            $server->deleteItems($old_ids, $index);
+          }
+          else {
+            $tasks = variable_get('search_api_tasks', array());
+            foreach ($old_ids as $id) {
+              $tasks[$server->machine_name][$index->machine_name][] = 'delete-' . $id;
+            }
+            variable_set('search_api_tasks', $tasks);
+          }
+        }
+      }
     }
-    // Get all existing IDs, in case we are just
-
-    $all_ids = $this->getAllItemIds();
-    $this->trackItemInsert($new_ids, $indexes);
   }
 
   /**
@@ -129,7 +161,10 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     $ids = array();
 
     foreach ($entities as $id => $entity) {
-      // @todo
+      foreach (search_api_et_item_languages($entity, $index) as $lang) {
+        $lang_id = "{$lang}_{$id}";
+        $ids[$lang_id] = $lang_id;
+      }
     }
 
     return $ids;

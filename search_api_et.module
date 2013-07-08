@@ -39,3 +39,18 @@ function search_api_et_search_api_index_update(SearchApiIndex $index) {
       ->execute();
   }
 }
+
+/**
+ * Determines the languages that are available for an entity in a certain index.
+ *
+ * @param object $entity
+ *   The entity for which languages should be determined.
+ * @param SearchApiIndex $index
+ *   The index whose settings should be used for determining the languages.
+ *
+ * @return array
+ *   An array of language codes for the languages that are available.
+ */
+function search_api_et_item_languages($entity, SearchApiIndex $index) {
+  // @todo Implement.
+}
