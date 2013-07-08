@@ -6,3 +6,4 @@ core = "7.x"
 dependencies[] = search_api
 
 files[] = datasource.inc
+files[] = property_info_alter.inc
