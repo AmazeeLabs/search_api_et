@@ -140,3 +140,26 @@ function search_api_et_entity_translation_delete($entity_type, $entity, $langcod
   $item_id = $langcode . '_' . $entity_id;
   search_api_track_item_delete('search_api_et_' . $entity_type, array($item_id));
 }
+
+/**
+ * Implements hook_features_export_alter().
+ *
+ * Adds dependency information for relevant exported indexes.
+ */
+function search_api_et_features_export_alter(&$export, $module_name) {
+  if (isset($export['features']['search_api_index'])) {
+    // Check all of the exported index definitions.
+    foreach ($export['features']['search_api_index'] as $index_name) {
+      $indexes = search_api_index_load_multiple(FALSE, array('machine_name' => $index_name));
+      $index = reset($indexes);
+      $controller = search_api_get_datasource_controller($index->item_type);
+      if ($controller instanceof SearchApiEtDatasourceController) {
+        if (!isset($export['dependencies']['search_api_et'])) {
+          $export['dependencies']['search_api_et'] = 'search_api_et';
+        }
+      }
+    }
+    // Ensure the dependencies list is still sorted alphabetically.
+    ksort($export['dependencies']);
+  }
+}
