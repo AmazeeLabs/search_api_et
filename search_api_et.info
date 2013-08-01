@@ -5,6 +5,7 @@ core = "7.x"
 
 dependencies[] = field
 dependencies[] = search_api
+dependencies[] = entity_translation
 
 files[] = datasource.inc
 files[] = property_info_alter.inc
