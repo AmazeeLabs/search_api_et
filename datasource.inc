@@ -63,7 +63,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
           $entity = clone $entities[$entity_id];
           $entity->search_api_et_id = $id;
           $entity->language = $lang;
-          // @todo Remove data of other languages from fields?
           $items[$id] = $entity;
         }
       }
@@ -82,7 +81,11 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     $property_info_alter = isset($info['property info alter']) ? $info['property info alter'] : NULL;
     $callback = new SearchApiEtPropertyInfoAlter($property_info_alter);
     $info['property info alter'] = array($callback, 'propertyInfoAlter');
-    return entity_metadata_wrapper($this->entityType, $item, $info);
+    $wrapper = entity_metadata_wrapper($this->entityType, $item, $info);
+    if (!empty($item->search_api_language)) {
+      $wrapper = $wrapper->language($item->search_api_language);
+    }
+    return $wrapper;
   }
 
   /**
@@ -161,7 +164,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     $ids = array();
 
     foreach ($entities as $id => $entity) {
-      foreach (search_api_et_item_languages($entity, $index) as $lang) {
+      foreach (search_api_et_item_languages($entity, $this->entityType, $index) as $lang) {
         $lang_id = "{$lang}_{$id}";
         $ids[$lang_id] = $lang_id;
       }

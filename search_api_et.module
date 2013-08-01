@@ -14,7 +14,7 @@ function search_api_et_search_api_item_type_info() {
   $types = array();
 
   foreach (entity_get_property_info() as $type => $property_info) {
-    if ($info = entity_get_info($type) && field_has_translation_handler($type)) {
+    if (($info = entity_get_info($type)) && field_has_translation_handler($type)) {
       $types["search_api_et_$type"] = array(
         'name' => t('!type (multilingual)', array('!type' => $info['label'])),
         'datasource controller' => 'SearchApiEtDatasourceController',
