@@ -7,5 +7,5 @@ dependencies[] = field
 dependencies[] = search_api
 dependencies[] = entity_translation
 
-files[] = datasource.inc
-files[] = property_info_alter.inc
+files[] = includes/datasource_entity.inc
+files[] = includes/property_info_alter.inc
