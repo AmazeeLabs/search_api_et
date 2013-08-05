@@ -76,11 +76,18 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    */
   public function getMetadataWrapper($item = NULL, array $info = array()) {
     // Since this is usually called with a "property info alter" callback
-    // already in place (and only one value is allowed), we have to employ this
-    // trick to make it work.
+    // already in place (and only one value is allowed), we have to call
+    // the existing callback from within our own callback to make it work.
     $property_info_alter = isset($info['property info alter']) ? $info['property info alter'] : NULL;
     $callback = new SearchApiEtPropertyInfoAlter($property_info_alter);
     $info['property info alter'] = array($callback, 'propertyInfoAlter');
+
+    // If the item isn't the object and a multilingual id is provided
+    // extract the entity id to load and wrap the entity.
+    if (!is_object($item) && is_scalar($item)) {
+      list($item_language, $item) = explode('_', $item);
+    }
+
     $wrapper = entity_metadata_wrapper($this->entityType, $item, $info);
     if (!empty($item->search_api_language)) {
       $wrapper = $wrapper->language($item->search_api_language);
