@@ -84,7 +84,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
 
     // If the item isn't the object and a multilingual id is provided
     // extract the entity id to load and wrap the entity.
-    if (!is_object($item) && is_scalar($item)) {
+    if (!is_object($item) && is_scalar($item) && strpos($item, '_') !== FALSE) {
       list($item_language, $item) = explode('_', $item);
     }
 

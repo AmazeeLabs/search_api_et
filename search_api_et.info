@@ -9,3 +9,4 @@ dependencies[] = entity_translation
 
 files[] = includes/datasource_entity.inc
 files[] = includes/property_info_alter.inc
+files[] = includes/views_query.inc

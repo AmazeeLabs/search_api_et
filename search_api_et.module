@@ -6,6 +6,15 @@
  */
 
 /**
+ * Implements hook_views_api().
+ */
+function search_api_et_views_api() {
+  return array(
+    'api' => '3',
+  );
+}
+
+/**
  * Implements hook_search_api_item_type_info().
  *
  * Provides a multilingual version of all entity types.
