@@ -101,7 +101,7 @@ function search_api_et_form_search_api_admin_index_edit_alter(&$form, &$form_sta
       '#title' => t('Languages to be included in the index'),
       '#description' => t('Determines for which languages an item should be created in the index for each entity:') . '<br />'
                       . t("- <em>all site languages</em>: create items for all languages enabled on the site, even if specific entity fields don't have a translation in a given language,") . '<br />'
-                      . t('- <em>all entity languages</em>: create items for languages which have at least one translated fields on the specific entity,') . '<br />'
+                      . t('- <em>all entity languages</em>: create items for languages which have at least one translated field on the specific entity (recommended),') . '<br />'
                       . t('- <em>completed entity languages</em>: only include languages for which all translatable fields have been translated on the specific entity.') . '<br />'
                       . t('Changing this setting will force content for this index to be re-queued and re-indexed.'),
       '#options' => array(
