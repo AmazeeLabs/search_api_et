@@ -40,32 +40,3 @@ function search_api_et_schema() {
 
   return $schema;
 }
-
-/**
- * Implements hook_disable().
- *
- * Yes it's true, normally we should delete indexes only when module is being
- * uninstalled, not just disabled, however if we keep those indexes after
- * disabling the module, they will still be displayed on Search API index
- * listing page, and each click on any of such index-related links will end up
- * with SearchApiException, which would be better to avoid.
- */
-function search_api_et_disable() {
-  module_load_include('inc', 'search_api_et', 'property_info_alter');
-  $deleted_indexes = array();
-  foreach (search_api_index_load_multiple(FALSE) as $index) {
-    $controller = search_api_get_datasource_controller($index->item_type);
-    if ($controller instanceof SearchApiEtDatasourceController) {
-      // @TODO: What would happen if an index is defined in a feature?
-      // Will we be able to delete it? Should we disable if first just in case
-      // before trying to delete?
-      search_api_index_delete($index->id);
-      $deleted_indexes[] = $index->name;
-    }
-  }
-  if (!empty($deleted_indexes)) {
-    drupal_set_message(t('The following Search API indexes were deleted: @indexes.', array(
-      '@indexes' => implode(', ', $deleted_indexes),
-    )), 'warning');
-  }
-}
