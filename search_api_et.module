@@ -226,6 +226,8 @@ function search_api_et_entity_translation_insert($entity_type, $entity, $transla
   list($entity_id) = entity_extract_ids($entity_type, $entity);
   $item_id = $translation['language'] . '_' . $entity_id;
   search_api_track_item_insert('search_api_et_' . $entity_type, array($item_id));
+  // Optionally run re-queueing for "completed entity languages" indexes.
+  drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_type);
 }
 
 /**
@@ -235,6 +237,8 @@ function search_api_et_entity_translation_update($entity_type, $entity, $transla
   list($entity_id) = entity_extract_ids($entity_type, $entity);
   $item_id = $translation['language'] . '_' . $entity_id;
   search_api_track_item_change('search_api_et_' . $entity_type, array($item_id));
+  // Optionally run re-queueing for "completed entity languages" indexes.
+  drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_type);
 }
 
 /**
@@ -244,6 +248,105 @@ function search_api_et_entity_translation_delete($entity_type, $entity, $langcod
   list($entity_id) = entity_extract_ids($entity_type, $entity);
   $item_id = $langcode . '_' . $entity_id;
   search_api_track_item_delete('search_api_et_' . $entity_type, array($item_id));
+  // No need to additionally re-queue "completed entity languages" indexes here,
+  // as in two hooks above, as everything is taken care of by default.
+}
+
+/**
+ * Implements hook_field_update_field().
+ *
+ * Re-queue all "completed entity languages" indexes on field instance creation
+ * (which actually is a 3-step process, and translation can be enabled only on
+ * the last step, which actually then becomes field update) and update - needed
+ * only when field translation is being enabled or disabled.
+ */
+function search_api_et_field_update_field($field, $prior_field, $has_data) {
+  if ($field['translatable'] != $prior_field['translatable']) {
+    $entity_types = array_keys($field['bundles']);
+    drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_types);
+  }
+}
+
+/**
+ * Implements hook_field_delete_instance().
+ *
+ * Re-queue all "completed entity languages" indexes on field instance deletion.
+ *
+ * Note that instance creation and updates are handled by
+ * hook_field_update_field() implementation.
+ */
+function search_api_et_field_delete_instance($instance) {
+  $field_info = field_info_field($instance['field_name']);
+  if (field_is_translatable($instance['entity_type'], $field_info)) {
+    drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $instance['entity_type']);
+  }
+}
+
+/**
+ * Implements hook_multilingual_settings_changed().
+ *
+ * Re-queue all "completed entity languages" indexes when a language has been
+ * added, removed, enabled or disabled.
+ */
+function search_api_et_multilingual_settings_changed() {
+  drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes');
+}
+
+/**
+ * Shutdown function to re-queue "completed entity languages" indexes.
+ *
+ * If there are any multilingual indexes configured to use "completed entity
+ * languages" only (for which all translatable fields have to be translated
+ * for a translation to be included in an index), after each translation
+ * update we need to re-check if such translation should be included in an
+ * index. (For example, for a completed translation already existing in the
+ * index, if a translation of a single field was removed, then the whole
+ * translation needs to be removed from the index, as it is not "complete"
+ * anymore.)
+ *
+ * The re-queueing is called from the shutdown function because some of the
+ * update hooks are invoked before the relevant change is really saved to the
+ * database (for example hook_entity_translation_update() implementation is
+ * called before the translation is really saved), which means that we can't
+ * force index re-queueing from such hook, as it would work with incorrect
+ * (old) data. Instead, we need to wait for the new data to be saved first,
+ * therefore use a shutdown function to force re-queueing.
+ *
+ * @param string $entity_type
+ *   The entity type for which indexes need to be re-queued.
+ *
+ * @see search_api_et_entity_translation_insert()
+ * @see search_api_et_entity_translation_update()
+ * @see search_api_et_field_update_field()
+ * @see search_api_et_field_delete_instance()
+ * @see search_api_et_multilingual_settings_changed()
+ */
+function search_api_et_shutdown_requeue_indexes($entity_types = NULL) {
+  $conditions = array(
+    'enabled' => 1,
+    'read_only' => 0,
+  );
+  if (!empty($entity_types)) {
+    if (!is_array($entity_types)) {
+      $entity_types = array($entity_types);
+    }
+    $entity_types = array_map(function($entity_type) {
+      return 'search_api_et_' . $entity_type;
+    }, $entity_types);
+    $conditions['item_type'] = $entity_types;
+  }
+  $indexes = search_api_index_load_multiple(FALSE, $conditions);
+  if (!$indexes) {
+    return;
+  }
+  foreach ($indexes as $index) {
+    // Re-queue only those indexes for which "Languages to be included in the
+    // index" option is set to "completed entity languages".
+    if ($index->options['search_api_et']['include'] == 'complete') {
+      $index->queueItems();
+      $index->reindex();
+    }
+  }
 }
 
 /**
