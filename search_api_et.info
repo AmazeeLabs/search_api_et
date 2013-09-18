@@ -4,7 +4,7 @@ package = Search
 core = "7.x"
 
 dependencies[] = field
-dependencies[] = search_api
+dependencies[] = search_api (>= 7.x-1.6)
 dependencies[] = entity_translation
 
 files[] = includes/datasource_entity.inc
