@@ -112,44 +112,58 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    * index changes, to take care of new and/or out-dated IDs.
    */
   public function startTracking(array $indexes) {
-    // Since existing items are index-specific, we have to do this one by one.
-    // (Although in nearly all cases, this will be called with only a single
-    // index anyways.)
+    if (!$this->table) {
+      return;
+    }
+
+    // We first clear the tracking table for all indexes, so we can just insert
+    // all items again without any key conflicts.
+    // @TODO: Update the tracking table instead of removing and re-adding items.
+    // Clearing the tracking table first is standard Search API behavior, it
+    // would be nicer though to update its content instead, by adding missing
+    // item IDs and removing those that shouldn't be there anymore.
+    $this->stopTracking($indexes);
+
+    $operations = array();
+
+    // Find out number of all entities to be processed.
     foreach ($indexes as $index) {
-      // Get all existing IDs, in case we are just updating the items, not
-      // starting fresh.
-      $sql = 'SELECT item_id FROM {' . $this->table . '} WHERE index_id = :id';
-      $existing = db_query($sql, array(':id' => $index->id));
-      $existing = $existing->fetchAllKeyed(0, 0);
-      // Get all IDs right now.
-      $all_ids = $this->getAllIndexItemIds($index);
-      // Compare the two sets in both directions to determine new and out-dated
-      // items.
-      if ($new_ids = array_diff_key($all_ids, $existing)) {
-        $this->trackItemInsert($new_ids, array($index));
+      $entity_type = $index->getEntityType();
+
+      $query = new EntityFieldQuery();
+      $entities = $query->entityCondition('entity_type', $entity_type)
+        ->execute();
+      if (empty($entities[$entity_type])) {
+        continue;
       }
-      if ($old_ids = array_diff_key($existing, $all_ids)) {
-        // We cannot use search_api_track_item_delete() here, since that would
-        // delete the item for ALL indexes with this type, for which the
-        // settings might differ. Therefore, we just extract the relevant code
-        // here.
-        // (We do not need to check for read_only, as this method will never be
-        // called for read-only indexes anyways.)
-        $this->trackItemDelete($old_ids, array($index));
-        if ($index->server) {
-          $server = $index->server();
-          if ($server->enabled) {
-            $server->deleteItems($old_ids, $index);
-          }
-          else {
-            $tasks = variable_get('search_api_tasks', array());
-            foreach ($old_ids as $id) {
-              $tasks[$server->machine_name][$index->machine_name][] = 'delete-' . $id;
-            }
-            variable_set('search_api_tasks', $tasks);
-          }
-        }
+
+      $steps = ceil(count($entities[$entity_type]) / $index->options['cron_limit']);
+
+      for ($step = 0; $step < $steps; $step++) {
+        $operations[] = array('search_api_et_batch_queue_entities', array($index, array_keys($entities[$entity_type]), $step));
       }
+    }
+
+    // This might be called both from web interface as well as from drush.
+    $t = drupal_is_cli() ? 'dt' : 't';
+
+    $batch = array(
+      'title' => $t('Adding items to the index queue'),
+      'operations' => $operations,
+      'finished' => 'search_api_et_batch_queue_entities_finished',
+      'progress_message' => $t('Completed about @percentage% of the queueing operation.'),
+      'file' => drupal_get_path('module', 'search_api_et') . '/search_api_et.batch.inc',
+    );
+    batch_set($batch);
+
+    if (drupal_is_cli()) {
+      // Calling drush_backend_batch_process() to start batch execution directly
+      // from here doesn't work for some unknown reason, so we need to call it
+      // from a shutdown function instead.
+      drupal_register_shutdown_function('search_api_et_shutdown_batch_process');
+    }
+    else {
+      batch_process();
     }
   }
 

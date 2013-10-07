@@ -200,8 +200,7 @@ function search_api_et_item_languages($entity, $type, SearchApiIndex $index) {
   $languages = array();
   $field_count = 0;
   foreach (field_info_instances($type, $bundle) as $field_name => $instance) {
-    $field = field_info_field($field_name);
-    if (!empty($field['translatable']) && isset($entity->{$instance['field_name']})) {
+    if (isset($entity->{$instance['field_name']})) {
       ++$field_count;
       foreach ($entity->{$instance['field_name']} as $lang => $data) {
         $languages += array($lang => 0);
@@ -347,6 +346,16 @@ function search_api_et_shutdown_requeue_indexes($entity_types = NULL) {
       $index->reindex();
     }
   }
+}
+
+/**
+ * Shutdown function to start batch job for queueing items for indexes being
+ * enabled.
+ *
+ * @see SearchApiEtDatasourceController::startTracking()
+ */
+function search_api_et_shutdown_batch_process() {
+  drush_backend_batch_process();
 }
 
 /**
