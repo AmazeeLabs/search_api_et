@@ -344,9 +344,7 @@ function search_api_et_shutdown_requeue_indexes($entity_types = NULL) {
     if (!is_array($entity_types)) {
       $entity_types = array($entity_types);
     }
-    $entity_types = array_map(function($entity_type) {
-      return 'search_api_et_' . $entity_type;
-    }, $entity_types);
+    $entity_types = array_map('_search_api_et_get_item_type', $entity_types);
     $conditions['item_type'] = $entity_types;
   }
   $indexes = search_api_index_load_multiple(FALSE, $conditions);
@@ -361,6 +359,20 @@ function search_api_et_shutdown_requeue_indexes($entity_types = NULL) {
       $index->reindex();
     }
   }
+}
+
+/**
+ * Returns multilingual item type name for provided entity type.
+ *
+ * @param string $entity_type
+ *   Entity type name.
+ * @return string
+ *   Multilingual item type name.
+ *
+ * @see search_api_et_shutdown_requeue_indexes()
+ */
+function _search_api_et_get_item_type($entity_type) {
+  return 'search_api_et_' . $entity_type;
 }
 
 /**
