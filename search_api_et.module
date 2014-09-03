@@ -36,6 +36,21 @@ function search_api_et_search_api_item_type_info() {
 }
 
 /**
+ * Implements hook_search_api_processor_info().
+ */
+function search_api_et_search_api_processor_info() {
+  $processors = array();
+
+  $processors['search_api_et_remove_language'] = array(
+    'name' => t('Remove language prefix from result item ids'),
+    'description' => t('This processor will remove language prefix from indexed item ids, thus preventing the same entity being returned more than once in search results.'),
+    'class' => 'SearchApiEtRemoveLanguageFromItemId',
+  );
+
+  return $processors;
+}
+
+/**
  * Implements search_api_index_update().
  */
 function search_api_et_search_api_index_update(SearchApiIndex $index) {
