@@ -93,6 +93,21 @@ function search_api_et_batch_queue_entities_finished($success, $results, $operat
         $drupal_set_message($format_plural($results['queued'][$index->id], 'Successfully added 1 item to the @index index queue.', 'Successfully added @count items to the @index index queue.', array('@index' => $index->name)), $success_message);
       }
       $redirect = 'admin/config/search/search_api/index/' . $index->machine_name;
+
+      // If the queueing was run on a freshly created index, the fields has not
+      // been configured yet, therefore redirecting to index's View page would
+      // cause an error, so let's redirect to index's Fields configuration page
+      // instead, as search_api_admin_add_index_submit() would do normally.
+      // (It doesn't in this case, as we are already too late in page execution
+      // process, doing the queueing from the shutdown function, so the redirect
+      // defined at the end of search_api_admin_add_index_submit() is not being
+      // used. That's the unfortunate downside of queueing using Drupal's batch,
+      // and the difference between this datasource controller and standard
+      // SearchApiEntityDataSourceController.)
+      if (empty($index->options['fields'])) {
+        $redirect .= '/fields';
+        drupal_set_message(t('The index was successfully created. Please set up its indexed fields now.'));
+      }
     }
   }
   else {
