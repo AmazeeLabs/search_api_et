@@ -234,6 +234,24 @@ function search_api_et_item_languages($entity, $type, SearchApiIndex $index) {
 }
 
 /**
+ * Implements hook_entity_update().
+ */
+function search_api_et_entity_update($entity, $entity_type) {
+  // Entity original language has been changed.
+  if (!empty($entity->language) && !empty($entity->original->language) && $entity->language != $entity->original->language) {
+    list($entity_id) = entity_extract_ids($entity_type, $entity);
+    $original_item_id = $entity->original->language . '_' . $entity_id;
+    $item_id = $entity->language . '_' . $entity_id;
+    // Remove tracking for not only old, but also for new item ID, just in case.
+    search_api_track_item_delete('search_api_et_' . $entity_type, array($original_item_id));
+    search_api_track_item_delete('search_api_et_' . $entity_type, array($item_id));
+    search_api_track_item_insert('search_api_et_' . $entity_type, array($item_id));
+    // Optionally run re-queueing for "completed entity languages" indexes.
+    drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_type);
+  }
+}
+
+/**
  * Implements hook_entity_translation_insert().
  */
 function search_api_et_entity_translation_insert($entity_type, $entity, $translation, $values = array()) {
