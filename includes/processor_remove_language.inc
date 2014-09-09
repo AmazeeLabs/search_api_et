@@ -37,7 +37,12 @@ class SearchApiEtRemoveLanguageFromItemId extends SearchApiAbstractProcessor {
       foreach ($response['results'] as $key => $result) {
         if (strpos($result['id'], '_') !== FALSE) {
           list($item_language, $item_id) = explode('_', $result['id']);
+          // Create new item keeping the full original result, as besides
+          // item_id it might also include other data (for example score).
+          $response['results'][$item_id] = $result;
+          // Replace multilingual item_id with simple entity id.
           $response['results'][$item_id]['id'] = $item_id;
+          // Get rid of the old item.
           unset($response['results'][$key]);
         }
       }
