@@ -168,7 +168,21 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   }
 
   /**
-   * Retrieves all item IDs for a given index.
+   * {@inheritdoc}
+   */
+  public function trackItemChange($item_ids, array $indexes, $dequeue = FALSE) {
+    // We assume here that we got entity ids in $item_ids, not proper item ids,
+    // so first let's try to convert them to real multilingual item ids.
+    $multilingual_item_ids = array();
+    foreach ($indexes as $index) {
+      $multilingual_item_ids += $this->getAllIndexItemIds($index, $item_ids);
+    }
+    // Once we have real multilingual item ids, we can do proper tracking.
+    parent::trackItemChange($multilingual_item_ids, $indexes, $dequeue);
+  }
+
+  /**
+   * Retrieves all item IDs for a given index, and, optionally, given entity IDs.
    *
    * Is used instead of SearchApiAbstractDataSourceController::getAllItemIds(),
    * since available items depend on the index configuration.
@@ -180,18 +194,24 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    *   An array with all item IDs for a given index, with keys and values both
    *   being the IDs.
    */
-  public function getAllIndexItemIds(SearchApiIndex $index) {
-    $entities = entity_load($this->entityType);
-    $ids = array();
-
-    foreach ($entities as $id => $entity) {
-      foreach (search_api_et_item_languages($entity, $this->entityType, $index) as $lang) {
-        $lang_id = "{$lang}_{$id}";
-        $ids[$lang_id] = $lang_id;
+  public function getAllIndexItemIds(SearchApiIndex $index, $item_ids = FALSE) {
+    // Try to load entities from provided $item_ids.
+    $entities = entity_load($this->entityType, $item_ids);
+    // If entities were loaded successully, it means that $item_ids do not have
+    // language prefix in them, so they are not really item ids, rather just
+    // entity ids, and we need to convert them to proper item ids.
+    if (!empty($entities)) {
+      $item_ids = array();
+      foreach ($entities as $id => $entity) {
+        foreach (search_api_et_item_languages($entity, $this->entityType, $index) as $lang) {
+          $lang_id = "{$lang}_{$id}";
+          $item_ids[$lang_id] = $lang_id;
+        }
       }
     }
-
-    return $ids;
+    // If no entities were loaded, it might mean that $item_ids might already
+    // be multilingual, and in this case let's just return them.
+    return $item_ids;
   }
 
 }
