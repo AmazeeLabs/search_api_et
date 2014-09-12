@@ -375,7 +375,10 @@ function search_api_et_shutdown_requeue_indexes($entity_types = NULL) {
   foreach ($indexes as $index) {
     // Re-queue only those indexes for which "Languages to be included in the
     // index" option is set to "completed entity languages".
-    if ($index->options['search_api_et']['include'] == 'complete') {
+    if (
+      !empty($index->options['search_api_et']['include'])
+      && $index->options['search_api_et']['include'] == 'complete'
+    ) {
       $index->queueItems();
       $index->reindex();
     }
