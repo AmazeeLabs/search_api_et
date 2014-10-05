@@ -89,10 +89,93 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     }
 
     $wrapper = entity_metadata_wrapper($this->entityType, $item, $info);
-    if (!empty($item->search_api_language)) {
-      $wrapper = $wrapper->language($item->search_api_language);
+
+    // If the item's language is set, let's set it on all wrapper fields,
+    // so that their translated values get indexed.
+    if (!empty($item->search_api_language) && !empty($item->search_api_index)) {
+      $this->setLanguage($wrapper, $item->search_api_index->options['fields'], $item->search_api_language);
     }
+
     return $wrapper;
+  }
+
+  /**
+   * Sets language of specific fields on an EntityMetadataWrapper object.
+   *
+   * This is essentially a copy of search_api_extract_fields(), just slightly
+   * adapted to set language on the wrapper fields instead of extracting them.
+   *
+   * @param EntityMetadataWrapper $wrapper
+   *   The wrapper on which fields to set language on.
+   * @param array $fields
+   *   The fields to set language on, as stored in an index. I.e., the array
+   *   keys are field names, the values are arrays with at least a "type" key
+   *   present.
+   * @param array $langcode
+   *   A code of the language to set to wrapper fields.
+   *
+   * @return array
+   *   The $fields array with additional "value" and "original_type" keys set.
+   *
+   * @see SearchApiEtDatasourceController::getMetadataWrapper()
+   * @see SearchApiEtDatasourceController::setLanguage()
+   */
+  protected function setLanguage($wrapper, $fields, $langcode) {
+    // If $wrapper is a list of entities, we have to aggregate their field values.
+    $wrapper_info = $wrapper->info();
+    if (search_api_is_list_type($wrapper_info['type'])) {
+      foreach ($fields as &$info) {
+        $info['value'] = array();
+        $info['original_type'] = $info['type'];
+      }
+      unset($info);
+      try {
+        foreach ($wrapper as $w) {
+          $nested_fields = $this->setLanguage($w, $fields, $langcode);
+          foreach ($nested_fields as $field => $info) {
+            if (isset($info['value'])) {
+              $fields[$field]['value'][] = $info['value'];
+            }
+            if (isset($info['original_type'])) {
+              $fields[$field]['original_type'] = $info['original_type'];
+            }
+          }
+        }
+      }
+      catch (EntityMetadataWrapperException $e) {
+        // Catch exceptions caused by not set list values.
+      }
+      return $fields;
+    }
+
+    $nested = array();
+    foreach ($fields as $field => $info) {
+      $pos = strpos($field, ':');
+      if ($pos === FALSE) {
+        if (isset($wrapper->$field) && method_exists($wrapper->$field, 'language')) {
+          $wrapper->$field->language($langcode);
+        }
+      }
+      else {
+        list($prefix, $key) = explode(':', $field, 2);
+        $nested[$prefix][$key] = $info;
+      }
+    }
+    foreach ($nested as $prefix => $nested_fields) {
+      if (isset($wrapper->$prefix)) {
+        $nested_fields = $this->setLanguage($wrapper->$prefix, $nested_fields, $langcode);
+        foreach ($nested_fields as $field => $info) {
+          $fields["$prefix:$field"] = $info;
+        }
+      }
+      else {
+        foreach ($nested_fields as &$info) {
+          $info['value'] = NULL;
+          $info['original_type'] = $info['type'];
+        }
+      }
+    }
+    return $fields;
   }
 
   /**

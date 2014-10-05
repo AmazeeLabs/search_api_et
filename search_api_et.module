@@ -416,3 +416,22 @@ function search_api_et_features_export_alter(&$export, $module_name) {
     ksort($export['dependencies']);
   }
 }
+
+/**
+ * Implements hook_search_api_index_items_alter().
+ *
+ * SearchApiEtDatasourceController::getMetadataWrapper() needs to know which
+ * index it is adding items to, so that it can loop over all indexed fields
+ * first and return their translated values before indexing them.
+ *
+ * @see SearchApiEtDatasourceController::getMetadataWrapper()
+ * @see SearchApiEtDatasourceController::setLanguage()
+ */
+function search_api_et_search_api_index_items_alter(array &$items, SearchApiIndex $index) {
+  $controller = search_api_get_datasource_controller($index->item_type);
+  if ($controller instanceof SearchApiEtDatasourceController) {
+    foreach (element_children($items) as $item_id) {
+      $items[$item_id]->search_api_index = $index;
+    }
+  }
+}
