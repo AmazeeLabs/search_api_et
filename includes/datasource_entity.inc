@@ -92,8 +92,13 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
 
     // If the item's language is set, let's set it on all wrapper fields,
     // so that their translated values get indexed.
-    if (!empty($item->search_api_language) && !empty($item->search_api_index)) {
-      $this->setLanguage($wrapper, $item->search_api_index->options['fields'], $item->search_api_language);
+    if (!empty($item->search_api_language)) {
+      // Set language on the wrapper as a whole.
+      $wrapper->language($item->search_api_language);
+      // Also try to set language on all wrapper fields, recursively.
+      if (!empty($item->search_api_index)) {
+        $this->setLanguage($wrapper, $item->search_api_index->options['fields'], $item->search_api_language);
+      }
     }
 
     return $wrapper;
