@@ -35,9 +35,21 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   public function loadItems(array $ids) {
     $item_languages = array();
     foreach ($ids as $id) {
+      // This method might receive two different types of item IDs depending on
+      // where it is being called from. For example, when called from
+      // search_api_index_specific_items(), it will receive multilingual IDs
+      // (with language prefix, like en_2). On the other hand, when called from
+      // a processor (for example from SearchApiHighlight::getFulltextFields()),
+      // the IDs won't be multilingual (no language prefix), just standard
+      // entity IDs instead. Therefore we need to account for both cases here.
+      // Case 1 - language prefix is in item ID.
       if (strpos($id, '_') !== FALSE) {
         list($langcode, $entity_id) = explode('_', $id, 2);
         $item_languages[$entity_id][] = $langcode;
+      }
+      // Case 2 - no language prefix in item ID.
+      else {
+        $item_languages[$id][] = NULL;
       }
     }
     $entities = entity_load($this->entityType, array_keys($item_languages));
@@ -61,7 +73,9 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     foreach ($item_languages as $entity_id => $langs) {
       if (!empty($entities[$entity_id])) {
         foreach ($langs as $lang) {
-          $id = "{$lang}_{$entity_id}";
+          // Following on the two cases described above, we should return
+          // the same item IDs (with or without language prefix) as received.
+          $id = !empty($lang) ? "{$lang}_{$entity_id}" : $entity_id;
           $entity = clone $entities[$entity_id];
           $entity->search_api_et_id = $id;
           $entity->language = $lang;
