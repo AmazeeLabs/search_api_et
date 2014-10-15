@@ -35,8 +35,10 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   public function loadItems(array $ids) {
     $item_languages = array();
     foreach ($ids as $id) {
-      list($langcode, $entity_id) = explode('_', $id, 2);
-      $item_languages[$entity_id][] = $langcode;
+      if (strpos($id, '_') !== FALSE) {
+        list($langcode, $entity_id) = explode('_', $id, 2);
+        $item_languages[$entity_id][] = $langcode;
+      }
     }
     $entities = entity_load($this->entityType, array_keys($item_languages));
 
