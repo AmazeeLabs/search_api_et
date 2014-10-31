@@ -129,18 +129,45 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     // Find out number of all entities to be processed.
     foreach ($indexes as $index) {
       $entity_type = $index->getEntityType();
+      $entity_info = entity_get_info($entity_type);
 
-      $query = new EntityFieldQuery();
-      $entities = $query->entityCondition('entity_type', $entity_type)
-        ->execute();
-      if (empty($entities[$entity_type])) {
-        continue;
+      if (!empty($entity_info['base table'])) {
+        // Assumes that all entities use the "base table" property and the
+        // "entity keys[id]" in the same way as the default controller.
+        $id_field = $entity_info['entity keys']['id'];
+        $table = $entity_info['base table'];
+
+        // We could also use a single insert (with a JOIN in the nested query),
+        // but this method will be mostly called with a single index, anyways.
+        // Select all entity ids.
+        $query = db_select($table, 't');
+        $query->addField('t', $id_field);
+        $item_ids = $query->execute()->fetchCol();
+
+        if (empty($item_ids)) {
+          continue;
+        }
+      }
+      else {
+        // In the absence of a 'base table', load the entities.
+        $query = new EntityFieldQuery();
+        $entities = $query->entityCondition('entity_type', $entity_type)
+          ->execute();
+
+        if (empty($entities)) {
+          continue;
+        }
+
+        $item_ids = array_keys($entities[$entity_type]);
       }
 
-      $steps = ceil(count($entities[$entity_type]) / $index->options['cron_limit']);
+      $steps = ceil(count($item_ids) / $index->options['cron_limit']);
 
       for ($step = 0; $step < $steps; $step++) {
-        $operations[] = array('search_api_et_batch_queue_entities', array($index, array_keys($entities[$entity_type]), $step));
+        $operations[] = array(
+          'search_api_et_batch_queue_entities',
+          array($index, $item_ids, $step),
+        );
       }
     }
 
