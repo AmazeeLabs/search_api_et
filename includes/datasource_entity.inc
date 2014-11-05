@@ -309,6 +309,17 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
       $multilingual_item_ids += $this->getAllIndexItemIds($index, $item_ids);
     }
     // Once we have real multilingual item ids, we can do proper tracking.
+
+    // There are situations where trackItemChange() is being called, but the
+    // item ids do not exist in the search_api_et_item table yet. To be sure
+    // that we have items to mark for update, let's try to insert them first.
+    // But then again, if they already exist in the database, we must delete
+    // them first before being able to re-insert them, otherwise we'll end up
+    // with Integrity constraint violation  PDOException.
+    parent::trackItemDelete($item_ids, $indexes);
+    parent::trackItemInsert($item_ids, $indexes);
+
+    // Finally, we can mark those items for an update.
     parent::trackItemChange($multilingual_item_ids, $indexes, $dequeue);
   }
 
