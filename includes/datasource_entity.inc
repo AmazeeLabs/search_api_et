@@ -324,8 +324,8 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     // But then again, if they already exist in the database, we must delete
     // them first before being able to re-insert them, otherwise we'll end up
     // with Integrity constraint violation  PDOException.
-    parent::trackItemDelete($item_ids, $indexes);
-    parent::trackItemInsert($item_ids, $indexes);
+    parent::trackItemDelete($multilingual_item_ids, $indexes);
+    parent::trackItemInsert($multilingual_item_ids, $indexes);
 
     // Finally, we can mark those items for an update.
     parent::trackItemChange($multilingual_item_ids, $indexes, $dequeue);
