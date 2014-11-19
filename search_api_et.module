@@ -223,8 +223,8 @@ function search_api_et_item_languages($entity, $type, SearchApiIndex $index) {
  */
 function search_api_et_entity_update($entity, $entity_type) {
   // Entity original language has been changed.
-  if (!empty($entity->language) && !empty($entity->original->language) && $entity->language != $entity->original->language) {
-    list($entity_id) = entity_extract_ids($entity_type, $entity);
+  list($entity_id) = entity_extract_ids($entity_type, $entity);
+  if (!empty($entity->language) && !empty($entity->original->language)) {
     $original_item_id = $entity->original->language . '_' . $entity_id;
     $item_id = $entity->language . '_' . $entity_id;
     // Remove tracking for not only old, but also for new item ID, just in case.
