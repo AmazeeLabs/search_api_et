@@ -219,57 +219,59 @@ function search_api_et_item_languages($entity, $type, SearchApiIndex $index) {
 }
 
 /**
+ * Returns item IDs for all languages that could be used for the entity.
+ *
+ * @param object $entity
+ * @param string $entity_type
+ *
+ * @return array
+ */
+function search_api_et_get_entity_item_ids($entity, $entity_type) {
+  $langcodes =& drupal_static(__FUNCTION__, array());
+  if (!isset($langcodes[$entity_type])) {
+    $conditions = array(
+      'enabled' => 1,
+      'item_type' => 'search_api_et_' . $entity_type,
+      'read_only' => 0,
+    );
+    $indexes = search_api_index_load_multiple(FALSE, $conditions);
+    $_langcodes = array();
+    foreach ($indexes as $key => $index) {
+      $_langcodes = array_merge($_langcodes, search_api_et_item_languages($entity, $entity_type, $index));
+    }
+    $langcodes[$entity_type] = array_values(array_unique($_langcodes));
+  }
+  list($entity_id) = entity_extract_ids($entity_type, $entity);
+  $item_ids = array();
+  foreach ($langcodes[$entity_type] as $langcode) {
+    $item_ids[] = $langcode . '_' . $entity_id;
+  }
+  return $item_ids;
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function search_api_et_entity_insert($entity, $entity_type) {
+  $item_ids = search_api_et_get_entity_item_ids($entity, $entity_type);
+  search_api_track_item_insert('search_api_et_' . $entity_type, $item_ids);
+}
+
+/**
  * Implements hook_entity_update().
  */
 function search_api_et_entity_update($entity, $entity_type) {
-  // Entity original language has been changed.
-  list($entity_id) = entity_extract_ids($entity_type, $entity);
-  if (!empty($entity->language) && !empty($entity->original->language)) {
-    $original_item_id = $entity->original->language . '_' . $entity_id;
-    $item_id = $entity->language . '_' . $entity_id;
-    // Remove tracking for not only old, but also for new item ID, just in case.
-    search_api_track_item_delete('search_api_et_' . $entity_type, array($original_item_id));
-    search_api_track_item_delete('search_api_et_' . $entity_type, array($item_id));
-    search_api_track_item_insert('search_api_et_' . $entity_type, array($item_id));
-    // Optionally run re-queueing for "completed entity languages" indexes.
-    drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_type);
-  }
+  $item_ids = search_api_et_get_entity_item_ids($entity, $entity_type);
+  search_api_track_item_delete('search_api_et_' . $entity_type, $item_ids);
+  search_api_track_item_insert('search_api_et_' . $entity_type, $item_ids);
 }
 
 /**
- * Implements hook_entity_translation_insert().
+ * Implements hook_entity_delete().
  */
-function search_api_et_entity_translation_insert($entity_type, $entity, $translation, $values = array()) {
-  list($entity_id) = entity_extract_ids($entity_type, $entity);
-  $item_id = $translation['language'] . '_' . $entity_id;
-  // First try to remove existing entries to avoid possible PDO Exception.
-  // See issue https://www.drupal.org/node/2284405
-  search_api_track_item_delete('search_api_et_' . $entity_type, array($item_id));
-  search_api_track_item_insert('search_api_et_' . $entity_type, array($item_id));
-  // Optionally run re-queueing for "completed entity languages" indexes.
-  drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_type);
-}
-
-/**
- * Implements hook_entity_translation_update().
- */
-function search_api_et_entity_translation_update($entity_type, $entity, $translation, $values = array()) {
-  list($entity_id) = entity_extract_ids($entity_type, $entity);
-  $item_id = $translation['language'] . '_' . $entity_id;
-  search_api_track_item_change('search_api_et_' . $entity_type, array($item_id));
-  // Optionally run re-queueing for "completed entity languages" indexes.
-  drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_type);
-}
-
-/**
- * Implements hook_entity_translation_delete().
- */
-function search_api_et_entity_translation_delete($entity_type, $entity, $langcode) {
-  list($entity_id) = entity_extract_ids($entity_type, $entity);
-  $item_id = $langcode . '_' . $entity_id;
-  search_api_track_item_delete('search_api_et_' . $entity_type, array($item_id));
-  // No need to additionally re-queue "completed entity languages" indexes here,
-  // as in two hooks above, as everything is taken care of by default.
+function search_api_et_entity_delete($entity, $entity_type) {
+  $item_ids = search_api_et_get_entity_item_ids($entity, $entity_type);
+  search_api_track_item_delete('search_api_et_' . $entity_type, $item_ids);
 }
 
 /**
