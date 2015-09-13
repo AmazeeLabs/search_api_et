@@ -184,6 +184,9 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     }
     foreach ($nested as $prefix => $nested_fields) {
       if (isset($wrapper->$prefix)) {
+        if (is_callable(array($wrapper->$prefix, 'language'))) {
+          $wrapper->$prefix->language($langcode);
+        }
         $nested_fields = $this->setLanguage($wrapper->$prefix, $nested_fields, $langcode);
         foreach ($nested_fields as $field => $info) {
           $fields["$prefix:$field"] = $info;
