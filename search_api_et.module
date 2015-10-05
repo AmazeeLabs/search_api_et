@@ -281,9 +281,15 @@ function search_api_et_entity_translation_delete($entity_type, $entity, $langcod
  * only when field translation is being enabled or disabled.
  */
 function search_api_et_field_update_field($field, $prior_field, $has_data) {
-  if ($field['translatable'] != $prior_field['translatable']) {
-    $entity_types = array_keys($field['bundles']);
-    drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_types);
+  if ($field['translatable'] != $prior_field['translatable']
+        && isset($field['bundles']) && is_array($field['bundles'])) {
+      $entity_types = array_keys($field['bundles']);
+
+      // Mark for re-indexing the matched entity types.
+      if (!empty($entity_types)) {
+        drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_types);
+      }
+    }
   }
 }
 
