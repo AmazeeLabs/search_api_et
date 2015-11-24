@@ -233,19 +233,20 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     // Find out number of all entities to be processed.
     foreach ($indexes as $index) {
       $entity_type = $index->getEntityType();
-      $entity_info = entity_get_info($entity_type);
 
-      if (!empty($entity_info['base table'])) {
+      if (!empty($this->entityInfo['base table']) && $this->idKey) {
         // Assumes that all entities use the "base table" property and the
         // "entity keys[id]" in the same way as the default controller.
-        $id_field = $entity_info['entity keys']['id'];
-        $table = $entity_info['base table'];
+        $table = $this->entityInfo['base table'];
 
         // We could also use a single insert (with a JOIN in the nested query),
         // but this method will be mostly called with a single index, anyways.
         // Select all entity ids.
         $query = db_select($table, 't');
-        $query->addField('t', $id_field);
+        $query->addField('t', $this->idKey);
+        if ($bundles = $this->getIndexBundles($index)) {
+          $query->condition($this->bundleKey, $bundles);
+        }
         $item_ids = $query->execute()->fetchCol();
 
         if (empty($item_ids)) {
@@ -255,8 +256,11 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
       else {
         // In the absence of a 'base table', load the entities.
         $query = new EntityFieldQuery();
-        $entities = $query->entityCondition('entity_type', $entity_type)
-          ->execute();
+        $query->entityCondition('entity_type', $entity_type);
+        if ($bundles = $this->getIndexBundles($index)) {
+          $query->entityCondition('bundle', $bundles);
+        }
+        $entities = $query->execute();
 
         if (empty($entities)) {
           continue;
