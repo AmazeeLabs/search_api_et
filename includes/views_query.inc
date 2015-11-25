@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * @file
+ * Contains SearchApiEtViewsQuery.
+ */
+
+/**
  * Views query class using a Search API index as the data source.
  */
 class SearchApiEtViewsQuery extends SearchApiViewsQuery {
