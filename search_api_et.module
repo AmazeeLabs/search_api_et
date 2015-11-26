@@ -264,7 +264,8 @@ function search_api_et_entity_update($entity, $entity_type) {
     foreach ($indexes as $index) {
       $datasource = $index->datasource();
       if ($datasource instanceof SearchApiEtDatasourceController) {
-        $item_ids = $datasource->getTrackableItemIds($index, array($entity_id));
+        // Keep only unique Item IDs
+        $item_ids = array_merge($item_ids, $datasource->getTrackableItemIds($index, array($entity_id)));
       }
     }
 
