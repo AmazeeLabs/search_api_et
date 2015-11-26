@@ -324,9 +324,9 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     $entity_ids = $this->getTrackableEntityIds($index, $entity_ids);
     $entities = entity_load($entity_type, $entity_ids);
 
-    foreach($entities as $entity_id => $entity) {
+    foreach ($entities as $entity_id => $entity) {
       foreach (search_api_et_item_languages($entity, $entity_type, $index) as $lang) {
-        $item_id = $lang. '_'. $entity_id;
+        $item_id = $lang . '_' . $entity_id;
         $ids[$item_id] = $item_id;
       }
     }
@@ -461,7 +461,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    */
   protected function getGroupedItemsIdsByEntity($item_ids) {
     $ret = array();
-    foreach($item_ids as $item_id) {
+    foreach ($item_ids as $item_id) {
       $id = $this->getItemInfo($item_id);
       if ($id) {
         $ret[$id][] = $item_id;
@@ -488,7 +488,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
       if ($parts == 'entity_id') {
         return $entity_id;
       }
-      else if ($parts == 'language') {
+      elseif ($parts == 'language') {
         return $language;
       }
     }
