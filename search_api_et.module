@@ -225,12 +225,27 @@ function search_api_et_entity_update($entity, $entity_type) {
   // Entity original language has been changed.
   list($entity_id) = entity_extract_ids($entity_type, $entity);
   if (!empty($entity->language) && !empty($entity->original->language)) {
-    $original_item_id = $entity->original->language . '_' . $entity_id;
-    $item_id = $entity->language . '_' . $entity_id;
-    // Remove tracking for not only old, but also for new item ID, just in case.
-    search_api_track_item_delete('search_api_et_' . $entity_type, array($original_item_id));
-    search_api_track_item_delete('search_api_et_' . $entity_type, array($item_id));
-    search_api_track_item_insert('search_api_et_' . $entity_type, array($item_id));
+    $et_entity_type = _search_api_et_get_item_type($entity_type);
+
+    // The Entity has changed its language, remove the old Item from the index!
+    if ($entity->original->language !== $entity->language) {
+      search_api_track_item_delete($et_entity_type, $entity->original->language . '_' . $entity_id);
+    }
+
+    // This Entity has changed, thus we're propagating the changes also to the
+    // related translations to keep up to date their non-translatable fields.
+    $item_ids = array();
+    $indexes = _search_api_et_get_indexes(array($entity_type));
+    foreach ($indexes as $index) {
+      $datasource = $index->datasource();
+      if ($datasource instanceof SearchApiEtDatasourceController) {
+        $item_ids = $datasource->getTrackableItemIds($index, array($entity_id));
+      }
+    }
+
+    // Track the chances to all translations.
+    search_api_track_item_change($et_entity_type, $item_ids);
+
     // Optionally run re-queueing for "completed entity languages" indexes.
     drupal_register_shutdown_function('search_api_et_shutdown_requeue_indexes', $entity_type);
   }
@@ -337,7 +352,7 @@ function search_api_et_multilingual_settings_changed() {
  * (old) data. Instead, we need to wait for the new data to be saved first,
  * therefore use a shutdown function to force re-queueing.
  *
- * @param string $entity_type
+ * @param string $entity_types
  *   The entity type for which indexes need to be re-queued.
  *
  * @see search_api_et_entity_translation_insert()
@@ -347,6 +362,28 @@ function search_api_et_multilingual_settings_changed() {
  * @see search_api_et_multilingual_settings_changed()
  */
 function search_api_et_shutdown_requeue_indexes($entity_types = NULL) {
+  $indexes = _search_api_et_get_indexes($entity_types);
+  foreach ($indexes as $index) {
+    // Re-queue only those indexes for which "Languages to be included in the
+    // index" option is set to "completed entity languages".
+    if (!empty($index->options['search_api_et']['include'])
+      && $index->options['search_api_et']['include'] == 'complete'
+    ) {
+      $index->queueItems();
+      $index->reindex();
+    }
+  }
+}
+
+/**
+ * Helper function to return indexes related to the given entity_types.
+ *
+ * @param array $entity_types
+ *    The entity types to filter from.
+ *
+ * @return SearchApiIndex[]|null
+ */
+function _search_api_et_get_indexes($entity_types = NULL) {
   $conditions = array(
     'enabled' => 1,
     'read_only' => 0,
@@ -359,20 +396,7 @@ function search_api_et_shutdown_requeue_indexes($entity_types = NULL) {
     $conditions['item_type'] = $entity_types;
   }
   $indexes = search_api_index_load_multiple(FALSE, $conditions);
-  if (!$indexes) {
-    return;
-  }
-  foreach ($indexes as $index) {
-    // Re-queue only those indexes for which "Languages to be included in the
-    // index" option is set to "completed entity languages".
-    if (
-      !empty($index->options['search_api_et']['include'])
-      && $index->options['search_api_et']['include'] == 'complete'
-    ) {
-      $index->queueItems();
-      $index->reindex();
-    }
-  }
+  return $indexes ? $indexes : array();
 }
 
 /**

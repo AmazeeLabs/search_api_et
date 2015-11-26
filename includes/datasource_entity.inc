@@ -318,7 +318,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    *   An array with all item IDs for a given index, with keys and values both
    *   being the IDs.
    */
-  protected function getTrackableItemIds(SearchApiIndex $index, $entity_ids = NULL) {
+  public function getTrackableItemIds(SearchApiIndex $index, $entity_ids = NULL) {
     $ids = array();
     $entity_type = $index->getEntityType();
     $entity_ids = $this->getTrackableEntityIds($index, $entity_ids);
@@ -377,7 +377,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    * @return array
    *   An array with all trackable Entity IDs for a given index.
    */
-  protected function getTrackableEntityIds(SearchApiIndex $index, $entity_ids = NULL) {
+  public function getTrackableEntityIds(SearchApiIndex $index, $entity_ids = NULL) {
     $entity_type = $index->getEntityType();
 
     if (!empty($this->entityInfo['base table']) && $this->idKey) {
