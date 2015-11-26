@@ -75,6 +75,7 @@ function search_api_et_get_index_settings(SearchApiIndex $index) {
   $settings = isset($index->options['search_api_et']) ? $index->options['search_api_et'] : array();
   $settings += array(
     'include' => 'incomplete',
+    'restrict undefined' => FALSE,
     'fallback language' => NULL,
   );
   return $settings;
@@ -112,6 +113,13 @@ function search_api_et_form_search_api_admin_index_edit_alter(&$form, &$form_sta
       '#default_value' => $settings['include'],
     );
 
+    $form['options']['search_api_et']['restrict undefined'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Restrict undefined language'),
+      '#description' => t('Removes LANGUAGE_NONE entities from being indexed. Entities that contain untranslatable fields will not be indexed, this may solve duplicate search results on partially translated content types.'),
+      '#default_value' => $settings['restrict undefined'],
+    );
+
     $form['options']['search_api_et']['fallback language'] = array(
       '#type' => 'select',
       '#title' => t('Fallback language'),
@@ -133,10 +141,22 @@ function search_api_et_form_search_api_admin_index_edit_alter(&$form, &$form_sta
  * @see search_api_et_form_search_api_admin_index_edit_alter()
  */
 function search_api_et_admin_index_edit_submit(array $form, array &$form_state) {
+  $reindex = FALSE;
+  $option_values = $form_state['values']['options']['search_api_et'];
+  $option_default = $form['options']['search_api_et'];
+
   // When 'Languages to be included in the index' setting value has changed,
   // all index items need to be re-queued and re-indexed, as most probably
   // their number will change.
-  if ($form_state['values']['options']['search_api_et']['include'] != $form['options']['search_api_et']['include']['#default_value']) {
+  $reindex = $reindex || ($option_values['include'] != $option_default['include']['#default_value']);
+
+  // When 'Restrict undefined language' setting value has changed,
+  // all index items need to be re-queued and re-indexed, as most probably
+  // their number will change.
+  $reindex = $reindex || ($option_values['restrict undefined'] != $option_default['restrict undefined']['#default_value']);
+
+  if ($reindex) {
+    /** @var SearchApiIndex $index */
     $index = $form_state['index'];
     $index->queueItems();
     $index->reindex();
@@ -183,7 +203,7 @@ function search_api_et_languages($enabled = FALSE, $neutral = TRUE) {
  *
  * @param object $entity
  *   The entity for which languages should be determined.
- * @param string $type
+ * @param string $entity_type
  *   The entity type of the entity.
  * @param SearchApiIndex $index
  *   The index whose settings should be used for determining the languages.
@@ -191,31 +211,34 @@ function search_api_et_languages($enabled = FALSE, $neutral = TRUE) {
  * @return array
  *   An array of language codes for the languages that are available.
  */
-function search_api_et_item_languages($entity, $type, SearchApiIndex $index) {
+function search_api_et_item_languages($entity, $entity_type, SearchApiIndex $index) {
+  module_load_include('inc', 'search_api_et');
   $settings = search_api_et_get_index_settings($index);
-  if ($settings['include'] == 'all') {
-    return array_keys(search_api_et_languages(FALSE, TRUE));
+
+  switch ($settings['include']) {
+    case 'all':
+      $languages = search_api_et_item_languages_all();
+      break;
+
+    case 'complete':
+      $languages = search_api_et_item_languages_complete($entity, $entity_type);
+      break;
+
+    case 'incomplete':
+    default:
+      $languages = search_api_et_item_languages_entity($entity, $entity_type);
+      break;
   }
-  list(, , $bundle) = entity_extract_ids($type, $entity);
-  $languages = array();
-  $field_count = 0;
-  foreach (field_info_instances($type, $bundle) as $field_name => $instance) {
-    if (isset($entity->{$instance['field_name']})) {
-      ++$field_count;
-      foreach ($entity->{$instance['field_name']} as $lang => $data) {
-        $languages += array($lang => 0);
-        ++$languages[$lang];
-      }
-    }
+
+  // Removing the LANGUAGE_NONE from the available translations, if configured.
+  if (TRUE == $settings['restrict undefined'] && $entity->language != LANGUAGE_NONE) {
+    // $languages is an array, flipping to easily remove the LANGUAGE_NONE item.
+    $languages = array_flip($languages);
+    unset($languages[LANGUAGE_NONE]);
+    $languages = array_keys($languages);
   }
-  if ($settings['include'] == 'complete') {
-    foreach ($languages as $lang => $count) {
-      if ($count < $field_count) {
-        unset($languages[$lang]);
-      }
-    }
-  }
-  return array_keys($languages);
+
+  return $languages;
 }
 
 /**
