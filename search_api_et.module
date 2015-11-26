@@ -230,8 +230,10 @@ function search_api_et_item_languages($entity, $entity_type, SearchApiIndex $ind
       break;
   }
 
-  // Removing the LANGUAGE_NONE from the available translations, if configured.
-  if (TRUE == $settings['restrict undefined'] && $entity->language != LANGUAGE_NONE) {
+  // Removing the LANGUAGE_NONE from the available translations, if the original
+  // entity is not translated, or if we are adding all the enabled languages to
+  // the index.
+  if (TRUE == $settings['restrict undefined'] && ($entity->language != LANGUAGE_NONE || $settings['include'] == 'all')) {
     // $languages is an array, flipping to easily remove the LANGUAGE_NONE item.
     $languages = array_flip($languages);
     unset($languages[LANGUAGE_NONE]);
