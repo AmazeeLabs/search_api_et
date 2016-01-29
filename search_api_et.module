@@ -230,10 +230,11 @@ function search_api_et_item_languages($entity, $entity_type, SearchApiIndex $ind
       break;
   }
 
+  $language = entity_language($entity_type, $entity);
   // Removing the LANGUAGE_NONE from the available translations, if the original
   // entity is not translated, or if we are adding all the enabled languages to
   // the index.
-  if (TRUE == $settings['restrict undefined'] && ($entity->language != LANGUAGE_NONE || $settings['include'] == 'all')) {
+  if (TRUE == $settings['restrict undefined'] && ($language != LANGUAGE_NONE || $settings['include'] == 'all')) {
     // $languages is an array, flipping to easily remove the LANGUAGE_NONE item.
     $languages = array_flip($languages);
     unset($languages[LANGUAGE_NONE]);
@@ -249,12 +250,16 @@ function search_api_et_item_languages($entity, $entity_type, SearchApiIndex $ind
 function search_api_et_entity_update($entity, $entity_type) {
   // Entity original language has been changed.
   list($entity_id) = entity_extract_ids($entity_type, $entity);
-  if (!empty($entity->language) && !empty($entity->original->language)) {
+
+  $language = entity_language($entity_type, $entity);
+  $old_language = entity_language($entity_type, $entity->original);
+
+  if (!empty($language) && !empty($old_language)) {
     $et_entity_type = _search_api_et_get_item_type($entity_type);
 
-    // The Entity has changed its language, remove the old Item from the index!
-    if ($entity->original->language !== $entity->language) {
-      search_api_track_item_delete($et_entity_type, $entity->original->language . '_' . $entity_id);
+    // If the Entity language has changed, remove the old tracked Item from the index.
+    if ($language != $old_language) {
+      search_api_track_item_delete($et_entity_type, array($old_language . '_' . $entity_id));
     }
 
     // This Entity has changed, thus we're propagating the changes also to the
