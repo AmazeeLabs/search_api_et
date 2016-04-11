@@ -8,7 +8,7 @@
 /**
  * Batch API callback for the item queueing functionality.
  *
- * @param object $index
+ * @param SearchApiIndex $index
  *   The index for which items should be queued.
  * @param integer $batch_size
  *   Number of items to index per batch.
@@ -38,8 +38,8 @@ function search_api_et_batch_queue_entities($index, $entity_ids, $step, array &$
   $ids = array();
   foreach ($entities_to_process as $id => $entity) {
     foreach (search_api_et_item_languages($entity, $entity_type, $index) as $lang) {
-      $lang_id = "{$lang}_{$id}";
-      $ids[$lang_id] = $lang_id;
+      $item_id = SearchApiEtHelper::buildItemId($id, $lang);
+      $ids[$item_id] = $item_id;
     }
   }
 
