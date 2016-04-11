@@ -25,7 +25,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   public function getIdFieldInfo() {
     return array(
       'key' => 'search_api_et_id',
-      'type' => 'string',
+      'type' => 'token',
     );
   }
 
@@ -33,25 +33,28 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    * {@inheritdoc}
    */
   public function loadItems(array $ids) {
+
     $item_languages = array();
     foreach ($ids as $id) {
       // This method might receive two different types of item IDs depending on
       // where it is being called from. For example, when called from
       // search_api_index_specific_items(), it will receive multilingual IDs
-      // (with language prefix, like en_2). On the other hand, when called from
+      // (with language prefix, like "2/en"). On the other hand, when called from
       // a processor (for example from SearchApiHighlight::getFulltextFields()),
       // the IDs won't be multilingual (no language prefix), just standard
       // entity IDs instead. Therefore we need to account for both cases here.
-      // Case 1 - language prefix is in item ID.
-      if (strpos($id, '_') !== FALSE) {
-        list($langcode, $entity_id) = explode('_', $id, 2);
-        $item_languages[$entity_id][] = $langcode;
+
+      // Case 1 - language is in item ID.
+      if (SearchApiEtHelper::isValidItemId($id)) {
+        $entity_id = SearchApiEtHelper::splitItemId($id, SearchApiEtHelper::ITEM_ID_ENTITY_ID);
+        $item_languages[$entity_id][] = SearchApiEtHelper::splitItemId($id, SearchApiEtHelper::ITEM_ID_LANGUAGE);
       }
-      // Case 2 - no language prefix in item ID.
+      // Case 2 - no language in item ID.
       else {
         $item_languages[$id][] = NULL;
       }
     }
+
     $entities = entity_load($this->entityType, array_keys($item_languages));
 
     // If some items could not be loaded, remove them from tracking.
@@ -60,8 +63,8 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
       if ($unknown) {
         $deleted = array();
         foreach ($unknown as $entity_id) {
-          foreach ($item_languages[$entity_id] as $langcode) {
-            $deleted[] = "{$langcode}_{$entity_id}";
+          foreach ($item_languages[$entity_id] as $language) {
+            $deleted[] = SearchApiEtHelper::buildItemId($entity_id, $language);
           }
         }
         search_api_track_item_delete($this->type, $deleted);
@@ -70,15 +73,15 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
 
     // Now arrange them according to our IDs again, with language.
     $items = array();
-    foreach ($item_languages as $entity_id => $langs) {
+    foreach ($item_languages as $entity_id => $languages) {
       if (!empty($entities[$entity_id])) {
-        foreach ($langs as $lang) {
+        foreach ($languages as $language) {
           // Following on the two cases described above, we should return
           // the same item IDs (with or without language prefix) as received.
-          $id = !empty($lang) ? "{$lang}_{$entity_id}" : $entity_id;
           $entity = clone $entities[$entity_id];
+          $id = !empty($language) ? SearchApiEtHelper::buildItemId($entity_id, $language) : $entity_id;
           $entity->search_api_et_id = $id;
-          $entity->language = $lang;
+          $entity->language = $language;
           $items[$id] = $entity;
         }
       }
@@ -100,8 +103,8 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
 
     // If the item isn't the object and a multilingual id is provided
     // extract the entity id to load and wrap the entity.
-    if (!is_object($item) && is_scalar($item) && strpos($item, '_') !== FALSE) {
-      list($item_language, $item) = explode('_', $item);
+    if (SearchApiEtHelper::isValidItemId($item)) {
+      $item = SearchApiEtHelper::splitItemId($item, SearchApiEtHelper::ITEM_ID_ENTITY_ID);
     }
 
     $wrapper = entity_metadata_wrapper($this->entityType, $item, $info);
@@ -219,13 +222,8 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     if (!$this->table) {
       return;
     }
-
     // We first clear the tracking table for all indexes, so we can just insert
     // all items again without any key conflicts.
-    // @TODO: Update the tracking table instead of removing and re-adding items.
-    // Clearing the tracking table first is standard Search API behavior, it
-    // would be nicer though to update its content instead, by adding missing
-    // item IDs and removing those that shouldn't be there anymore.
     $this->stopTracking($indexes);
 
     $operations = array();
@@ -269,37 +267,51 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   /**
    * {@inheritdoc}
    */
+  public function trackItemInsert(array $item_ids, array $indexes) {
+    dd([__FUNCTION__ => $item_ids]);
+    $ret = array();
+    foreach ($indexes as $index_id => $index) {
+      // Sometimes we get item_ids not meant to be tracked, just filter them out.
+      $ids = $this->filterTrackableIds($index, $item_ids);
+      if ($ids) {
+        // In some times the Item is alre
+        parent::trackItemDelete($ids, array($index));
+
+        // Actually add the items to the index.
+        parent::trackItemInsert($ids, array($index));
+        $ret[$index_id] = $index;
+      }
+    }
+    return $ret;
+  }
+
+
+  /**
+   * {@inheritdoc}
+   */
   public function trackItemChange($item_ids, array $indexes, $dequeue = FALSE) {
     // If this method was called from _search_api_index_reindex(), $item_ids
     // will be set to FALSE, which means we need to reindex all items, so no
     // need for any other processing below.
     if ($item_ids === FALSE) {
       parent::trackItemChange($item_ids, $indexes, $dequeue);
-      return;
+      return NULL;
     }
 
-    // Check if we get Entity IDs or Item IDs.
-    $is_entity_ids_list = FALSE == $this->getItemInfo(reset($item_ids));
+    $ret = array();
+    foreach ($indexes as $index_id => $index) {
+      // The $item_ids can contain a single EntityID if we get invoked from the
+      // hook: search_api_et_entity_update(). In this case we need to, for each
+      // Index, identify the set of ItemIDs that need to be marked as changed.
+      // Check if we get Entity IDs or Item IDs.
+      $ids = $this->getTrackableItemIdsFromMixedSource($index, $item_ids);
 
-    // If we got Entity IDs, let's convert them to Item IDs.
-    if ($is_entity_ids_list) {
-      foreach ($indexes as $index) {
-        $item_ids = $this->getTrackableItemIds($index, $item_ids);
+      if (!empty($ids)) {
+        parent::trackItemChange($ids, array($index), $dequeue);
+        $ret[$index_id] = $index;
       }
     }
-    // Once we have real multilingual Item IDs, we can do proper tracking.
-
-    // There are situations where trackItemChange() is being called, but the
-    // item ids do not exist in the search_api_et_item table yet. To be sure
-    // that we have items to mark for update, let's try to insert them first.
-    // But then again, if they already exist in the database, we must delete
-    // them first before being able to re-insert them, otherwise we'll end up
-    // with Integrity constraint violation  PDOException.
-    $this->trackItemDelete($item_ids, $indexes);
-    $this->trackItemInsert($item_ids, $indexes);
-
-    // Finally, we can mark those items for an update.
-    parent::trackItemChange($item_ids, $indexes, $dequeue);
+    return $ret;
   }
 
   /**
@@ -319,35 +331,22 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    *   being the IDs.
    */
   public function getTrackableItemIds(SearchApiIndex $index, $entity_ids = NULL) {
+    $entity_ids = $this->getTrackableEntityIds($index, $entity_ids);
+
+    if (empty($entity_ids)) {
+      return array();
+    }
+
     $ids = array();
     $entity_type = $index->getEntityType();
-    $entity_ids = $this->getTrackableEntityIds($index, $entity_ids);
     $entities = entity_load($entity_type, $entity_ids);
-
     foreach ($entities as $entity_id => $entity) {
       foreach (search_api_et_item_languages($entity, $entity_type, $index) as $lang) {
-        $item_id = $lang . '_' . $entity_id;
+        $item_id = SearchApiEtHelper::buildItemId($entity_id, $lang);
         $ids[$item_id] = $item_id;
       }
     }
-
     return $ids;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function trackItemInsert(array $item_ids, array $indexes) {
-    $ret = array();
-    foreach ($indexes as $index_id => $index) {
-      // Sometimes we get item_ids not meant to be tracked, just filter them out.
-      $ids = $this->filterTrackableIds($index, $item_ids);
-      if ($ids) {
-        parent::trackItemInsert($ids, array($index));
-        $ret[$index_id] = $index;
-      }
-    }
-    return $ret;
   }
 
   /**
@@ -356,14 +355,40 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   public function trackItemDelete(array $item_ids, array $indexes) {
     $ret = array();
     foreach ($indexes as $index_id => $index) {
-      // Sometimes we get item_ids not meant to be tracked, just filter them out.
-      $ids = $this->filterTrackableIds($index, $item_ids);
+      // The $item_ids can contain also single EntityID if we get invoked from the
+      // hook: search_api_et_entity_delete(). In this case we need to, for each
+      // Index, identify the set of ItemIDs that need to be marked as changed.
+      $ids = $this->getTrackableItemIdsFromMixedSource($index, $item_ids);
+
       if ($ids) {
         parent::trackItemDelete($ids, array($index));
         $ret[$index_id] = $index;
       }
     }
     return $ret;
+  }
+
+
+  /**
+   * Helper function to return the list of ItemIDs, fiven
+   * @param \SearchApiIndex $index
+   * @param $mixed_ids
+   * @return array
+   */
+  protected function getTrackableItemIdsFromMixedSource(SearchApiIndex $index, $mixed_ids) {
+    // Check if we get Entity IDs or Item IDs.
+    $first_item_id = reset($mixed_ids);
+    $is_valid_item_id = SearchApiEtHelper::isValidItemId($first_item_id);
+    if (!$is_valid_item_id) {
+      $entity_id = $first_item_id;
+      $ids = $this->getTrackableItemIds($index, $entity_id);
+    }
+    else {
+      // Filter the item_ids that need to be tracked by this index.
+      $ids = $this->filterTrackableIds($index, $mixed_ids);
+    }
+
+    return $ids;
   }
 
 
@@ -379,7 +404,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    */
   public function getTrackableEntityIds(SearchApiIndex $index, $entity_ids = NULL) {
     $entity_type = $index->getEntityType();
-
     if (!empty($this->entityInfo['base table']) && $this->idKey) {
       // Assumes that all entities use the "base table" property and the
       // "entity keys[id]" in the same way as the default controller.
@@ -409,7 +433,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
       $entities = $query->execute();
       $ids = array_keys($entities[$entity_type]);
     }
-
     return $ids;
   }
 
@@ -420,7 +443,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    * @param SearchApiIndex $index
    *   The SearchAPI index to use
    * @param array $item_ids
-   *   A list of trackable item IDs (in the form "{language}_{id} to check
+   *   A list of trackable item IDs (in the form "{id}/{language} to check
    * @return array
    */
   protected function filterTrackableIds(SearchApiIndex $index, $item_ids) {
@@ -439,7 +462,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
       // Keeping only the Entity IDs matched by the query
       $item_ids = array_intersect_key($merged_ids, array_flip($ids));
 
-      // Rebuilding the $ret to contain the '{id}_{lang}' IDs
+      // Rebuilding the $ret to contain the '{entity_id}/{language}' IDs
       if (!empty($item_ids)) {
         foreach ($item_ids as $ids) {
           $ret = array_merge($ret, $ids);
@@ -451,10 +474,10 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   }
 
   /**
-   * Helper function to group the given {language}_{entity_id} by {entity_id}.
+   * Helper function to group the given {entity_id}/{entity_id} by {entity_id}.
    *
    * @param array $item_ids
-   *  THe list of trackable IDs (in the form "{language}_{entity_id}")
+   *  The list of trackable item_ids (in the form "{entity_id}/{language}")
    * @return array
    *   A multilevel array where the outer array is keyed by the entity_id, and
    *   contains all the corresponding Item IDs.
@@ -462,38 +485,12 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   protected function getGroupedItemsIdsByEntity($item_ids) {
     $ret = array();
     foreach ($item_ids as $item_id) {
-      $id = $this->getItemInfo($item_id);
+      $id = SearchApiEtHelper::splitItemId($item_id, SearchApiEtHelper::ITEM_ID_ENTITY_ID);
       if ($id) {
         $ret[$id][] = $item_id;
       }
     }
     return $ret;
-  }
-
-  /**
-   * Helper function to split the Item ID into language or entity_id.
-   *
-   * @param string $item_id
-   *   The Item ID (as "{language}_{entity_id}")
-   * @param string $parts
-   *   The item part to return, available options. 'entity_id' or 'language'
-   * @return string|FALSE
-   *   Returns the requested part, FALSE if the item_id is not a properly
-   *   formatted Item ID
-   */
-  protected function getItemInfo($item_id, $parts = 'entity_id') {
-    // If a multilingual id is provided, then split it into {id} and {language}.
-    if (!empty($parts) && is_string($item_id) && strpos($item_id, '_') !== FALSE) {
-      list($language, $entity_id) = explode('_', $item_id, 2);
-      if ($parts == 'entity_id') {
-        return $entity_id;
-      }
-      elseif ($parts == 'language') {
-        return $language;
-      }
-    }
-
-    return FALSE;
   }
 
 }

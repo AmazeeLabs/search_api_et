@@ -1,3 +1,7 @@
+SearchAPI ET 7.x-2.x, xxxx-xx-xx
+--------------------------------
+- Preliminary refactoring of include classes.
+
 SearchAPI ET 7.x-2.0-alpha2, 2016-01-29
 ---------------------------------------
 - Fatal error when updating an entities language.
