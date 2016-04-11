@@ -268,7 +268,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    * {@inheritdoc}
    */
   public function trackItemInsert(array $item_ids, array $indexes) {
-    dd([__FUNCTION__ => $item_ids]);
     $ret = array();
     foreach ($indexes as $index_id => $index) {
       // Sometimes we get item_ids not meant to be tracked, just filter them out.
