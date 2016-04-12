@@ -10,14 +10,14 @@
  *
  * @param SearchApiIndex $index
  *   The index for which items should be queued.
- * @param integer $batch_size
- *   Number of items to index per batch.
- * @param integer $limit
- *   Maximum number of items to index.
- * @param array $context
+ * @param integer $entity_ids
+ *   The EntityIDs to be handled.
+ * @param integer $step
+ *   The step number.
+ * @param $context
  *   The batch context.
  */
-function search_api_et_batch_queue_entities($index, $entity_ids, $step, array &$context) {
+function search_api_et_batch_queue_entities($index, $entity_ids, $step, &$context) {
   // Persistent data among batch runs for results.
   if (!isset($context['results']['indexes'][$index->id])) {
     $context['results']['indexes'][$index->id] = $index;
