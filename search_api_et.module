@@ -20,8 +20,10 @@ function search_api_et_views_api() {
  * Provides a multilingual version of all entity types.
  */
 function search_api_et_search_api_item_type_info() {
-  $types = array();
+  // Ensure the SearchApiEtHelper class is loaded.
+  module_load_include('php', 'search_api_et', 'includes/SearchApiEtHelper');
 
+  $types = array();
   foreach (entity_get_property_info() as $type => $property_info) {
     if (($info = entity_get_info($type)) && field_has_translation_handler($type)) {
       $types[SearchApiEtHelper::getItemType($type)] = array(
