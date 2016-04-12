@@ -23,7 +23,7 @@ function search_api_et_batch_queue_entities($index, $entity_ids, $step, &$contex
     $context['results']['indexes'][$index->id] = $index;
     $context['results']['queued'][$index->id] = 0;
     if (drupal_is_cli() === TRUE) {
-      drush_log(dt("Adding items to the !index queue.", array('!index' => $index->name)), 'ok');
+      drush_log(dt('Adding items to the !index queue.', array('!index' => $index->name)), 'ok');
     }
   }
 
@@ -49,7 +49,11 @@ function search_api_et_batch_queue_entities($index, $entity_ids, $step, &$contex
 
   // Display progress message.
   $format_plural = drupal_is_cli() === TRUE ? '_search_api_drush_format_plural' : 'format_plural';
-  $context['message'] = $format_plural($context['results']['queued'][$index->id], 'Successfully queued 1 item.', 'Successfully queued @count items.');
+  $context['message'] = $format_plural($context['results']['queued'][$index->id],
+    'Index "!index": successfully queued 1 item.',
+    'Index "!index": successfully queued @count items.',
+    array('!index' => $index->name)
+  );
 }
 
 /**
