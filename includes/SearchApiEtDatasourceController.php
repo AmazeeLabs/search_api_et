@@ -468,7 +468,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   }
 
   /**
-   * Helper function to group the given {entity_id}/{entity_id} by {entity_id}.
+   * Helper function to group the given list of ItemIds by EntityIds
    *
    * @param array $item_ids
    *  The list of trackable item_ids (in the form "{entity_id}/{language}")
