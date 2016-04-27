@@ -1,5 +1,12 @@
 SearchAPI ET 7.x-2.x, xxxx-xx-xx
 --------------------------------
+- Issue #2712899 by gnucifer, thePanz: Code and comments cleanup.
+- Code and comments cleanup.
+- Updated Batch messages.
+- Ensure SearchApiEtHelper class is loaded.
+- Fixed documentation for search_api_et_batch_queue_entities() function.
+- Removed debug code.
+- Using new refactored classes, bugfixing and code cleanup.
 - Preliminary refactoring of include classes.
 
 SearchAPI ET 7.x-2.0-alpha2, 2016-01-29
