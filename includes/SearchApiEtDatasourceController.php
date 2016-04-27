@@ -33,7 +33,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
    * {@inheritdoc}
    */
   public function loadItems(array $ids) {
-
     $item_languages = array();
     foreach ($ids as $id) {
       // This method might receive two different types of item IDs depending on
@@ -273,7 +272,8 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
       // Sometimes we get item_ids not meant to be tracked, just filter them out.
       $ids = $this->filterTrackableIds($index, $item_ids);
       if ($ids) {
-        // In some times the Item is alre
+        // Some times the item could be already in the index, let try to remove
+        // them before inserting.
         parent::trackItemDelete($ids, array($index));
 
         // Actually add the items to the index.
@@ -283,7 +283,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     }
     return $ret;
   }
-
 
   /**
    * {@inheritdoc}
@@ -367,7 +366,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     return $ret;
   }
 
-
   /**
    * Helper function to return the list of ItemIDs, fiven
    * @param \SearchApiIndex $index
@@ -390,13 +388,11 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     return $ids;
   }
 
-
-
   /**
    * @param SearchApiIndex $index
    *   The index for which item IDs should be retrieved.
    * @param array $entity_ids
-   *   The
+   *   The entity ids to get the trackable entity ids for.
    *
    * @return array
    *   An array with all trackable Entity IDs for a given index.
@@ -434,7 +430,6 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     }
     return $ids;
   }
-
 
   /**
    * Filters the given Item IDs to include only the ones handled by the Index.
