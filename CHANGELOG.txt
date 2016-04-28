@@ -1,5 +1,9 @@
 SearchAPI ET 7.x-2.x, xxxx-xx-xx
 --------------------------------
+
+
+SearchAPI ET 7.x-2.0-alpha3, 2016-04-27
+---------------------------------------
 - Issue #2712801 by gnucifer: Check property info before handling entity-update and -delete hooks.
 - Issue #2712899 by gnucifer, thePanz: Code and comments cleanup.
 - Code and comments cleanup.
