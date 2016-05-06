@@ -25,7 +25,7 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
   public function getIdFieldInfo() {
     return array(
       'key' => 'search_api_et_id',
-      'type' => 'token',
+      'type' => 'string',
     );
   }
 
