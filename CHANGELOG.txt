@@ -1,5 +1,8 @@
 SearchAPI ET 7.x-2.x, xxxx-xx-xx
 --------------------------------
+
+SearchAPI ET 7.x-2.0-alpha4, 2016-05-06
+---------------------------------------
 - Wrong "token" type returned from getIdFieldInfo().
 
 SearchAPI ET 7.x-2.0-alpha3, 2016-04-27
