@@ -1,5 +1,6 @@
 SearchAPI ET 7.x-2.x, xxxx-xx-xx
 --------------------------------
+- Migrate the old ItemID format to the newer one.
 - Simplify filterTrackableIds logic
 
 SearchAPI ET 7.x-2.0-alpha4, 2016-05-06
