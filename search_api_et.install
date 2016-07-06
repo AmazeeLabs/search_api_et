@@ -152,7 +152,7 @@ function search_api_et_update_7200(&$sandbox) {
 
   $items = db_select('search_api_et_item', 'item')
     ->fields('item', array('item_id', 'index_id'))
-    ->range($sandbox['progress'], 50)
+    ->range($sandbox['progress'], 500)
     ->orderBy('item_id', 'ASC')
     ->execute();
 
@@ -174,7 +174,10 @@ function search_api_et_update_7200(&$sandbox) {
 
   // Inform on the progression.
   $sandbox['#finished'] = empty($sandbox['max']) ? 1 : ($sandbox['progress'] / $sandbox['max']);
+  if ($sandbox['#finished'] != 1) {
+    return t('SearchAPI ET: Updated !items of !total total.', array('!items' => $sandbox['progress'], '!total' => $sandbox['max']));
+  } else {
+    return t('SearchAPI ET: Migrate the old ItemID format to the newer one completed. You will need to run a re-index on search_api_et indexes.');
+  }
 
-  // Give user feedback.
-  return t('Migrate the old ItemID format to the newer one completed. You will need to run a re-index on search_api_et indexes.');
 }

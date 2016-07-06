@@ -1,5 +1,6 @@
 SearchAPI ET 7.x-2.x, xxxx-xx-xx
 --------------------------------
+- Followup for #2722459: updated update_N() function.
 - Migrate the old ItemID format to the newer one.
 - Simplify filterTrackableIds logic
 
