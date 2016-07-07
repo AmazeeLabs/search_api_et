@@ -85,10 +85,15 @@ function search_api_et_search_api_index_insert(SearchApiIndex $index) {
  * Implements hook_search_api_index_delete().
  */
 function search_api_et_search_api_index_delete(SearchApiIndex $index) {
-  // Only react on real delete, not revert.
+  // Keep track of Reverted indexes.
   if ($index->hasStatus(ENTITY_IN_CODE)) {
     $reverts = &drupal_static(__FUNCTION__, array());
     $reverts[$index->machine_name] = $index->id;
+  } else {
+    // We must delete our tracked items when the index is deleted.
+    db_delete('search_api_et_item')
+      ->condition('index_id', $index->id)
+      ->execute();
   }
 }
 

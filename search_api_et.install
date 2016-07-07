@@ -142,9 +142,26 @@ function search_api_et_install() {
 }
 
 /**
- * Migrate the old ItemID format to the newer one.
+ * Clean {search_api_et_item} table from outdated items.
  */
 function search_api_et_update_7200(&$sandbox) {
+  $indexes = db_select('search_api_index', 'sai')
+    ->fields('sai', array('id'))
+    ->distinct('distinct index.id')
+    ->execute()
+    ->fetchAllAssoc('id');
+
+  $index_ids = array_keys($indexes);
+
+  $res = db_delete('search_api_et_item')
+    ->condition('index_id', $index_ids, 'NOT IN')
+    ->execute();
+}
+
+/**
+ * Migrate the old ItemID format to the newer one.
+ */
+function search_api_et_update_7201(&$sandbox) {
   if (!isset($sandbox['progress'])) {
     $sandbox['progress'] = 0;
     $sandbox['max'] = db_query('SELECT COUNT(*) FROM {search_api_et_item}')->fetchField();
