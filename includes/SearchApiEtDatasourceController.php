@@ -455,7 +455,11 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
     // Generate the list of candidate ItemIDs from the current EntityIDs
     $trackable_item_ids = $this->getTrackableItemIds($index, array_keys($grouped_item_ids));
 
-    // Keeping only the ItemIds matched by the filter.
-    return array_intersect($item_ids, $trackable_item_ids);
+    // The $trackable_item_ids will contain all ItemIDs that should be indexed.
+    // Additional translations, other than the one provided in $item_ids, will
+    // be taken into account, to cover the case when a non-translatable field is
+    // changed on one translation and such change must be reflected to all other
+    // indexed translations.
+    return $trackable_item_ids;
   }
 }
