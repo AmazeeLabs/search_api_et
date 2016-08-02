@@ -286,6 +286,9 @@ class SearchApiEtDatasourceController extends SearchApiEntityDataSourceControlle
 
   /**
    * {@inheritdoc}
+   * @param $item_ids array|string
+   * @param $indexes SearchApiIndex[]
+   * @param $dequeue bool
    */
   public function trackItemChange($item_ids, array $indexes, $dequeue = FALSE) {
     // If this method was called from _search_api_index_reindex(), $item_ids

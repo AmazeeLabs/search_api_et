@@ -350,6 +350,11 @@ function search_api_et_entity_translation_insert($entity_type, $entity, $transla
   list($entity_id) = entity_extract_ids($entity_type, $entity);
   $item_id = SearchApiEtHelper::buildItemId($entity_id, $translation['language']);
 
+  // Entity that has been loaded previously and cached is now stale, make sure
+  // that subsequent loads will produce a fresh entity containing the inserted
+  // translation.
+  entity_get_controller($entity_type)->resetCache(array($entity_id));
+
   search_api_track_item_insert(SearchApiEtHelper::getItemType($entity_type), array($item_id));
 }
 
