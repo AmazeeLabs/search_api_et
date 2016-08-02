@@ -1,5 +1,9 @@
 SearchAPI ET 7.x-2.x, xxxx-xx-xx
 --------------------------------
+
+SearchAPI ET 7.x-2.0-alpha7, 2016-08-02
+---------------------------------------
+- Translations not properly indexed
 - Items are indexed also for Disabled languages
 
 SearchAPI ET 7.x-2.0-alpha5, 2016-07-11
