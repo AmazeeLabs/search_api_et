@@ -329,7 +329,25 @@ function search_api_et_entity_update($entity, $entity_type) {
   $et_entity_type = SearchApiEtHelper::getItemType($entity_type);
 
   $language = entity_language($entity_type, $entity);
-  $old_language = entity_language($entity_type, $entity->original);
+
+  // Mimic entity_language. In case we are using entity translation handler, do
+  // not retreive language from form.
+  // Invoke the callback to get the language. If there is no callback, try to
+  // get it from a property of the entity, otherwise NULL.
+  $info = entity_get_info($entity_type);
+  if (isset($info['language callback']) && $info['language callback'] == 'entity_translation_language' && function_exists($info['language callback'])) {
+    $handler = entity_translation_get_handler($entity_type, $entity);
+    $old_handler = entity_translation_get_handler($entity_type, $entity->original);
+    $old_language = $old_handler->getLanguage();
+    // If we are not in source language and source language does not change,
+    // remove old language to avoid source language to be deleted.
+    if ($handler->getSourceLanguage() == $old_handler->getSourceLanguage() && $old_language !== $language) {
+      $old_language = NULL;
+    }
+  }
+  else {
+    $old_language = entity_language($entity_type, $entity->original);
+  }
 
   // Check if the Entity language has been changed.
   if (!empty($language) && !empty($old_language)) {
@@ -339,8 +357,19 @@ function search_api_et_entity_update($entity, $entity_type) {
     }
   }
 
-  // Passing the EntityID only, so every index can properly handle their translations.
-  search_api_track_item_change($et_entity_type, array($entity_id));
+  // This Entity has changed, thus we're propagating the changes also to the
+  // related translations to keep up to date their non-translatable fields.
+  $item_ids = array();
+  $indexes = _search_api_et_get_indexes(array($entity_type));
+  foreach ($indexes as $index) {
+    $datasource = $index->datasource();
+    if ($datasource instanceof SearchApiEtDatasourceController) {
+      $item_ids = $datasource->getTrackableItemIds($index, array($entity_id));
+    }
+  }
+
+  // Track the chances to all translations.
+  search_api_track_item_change($et_entity_type, $item_ids);
 }
 
 /**
