@@ -368,8 +368,10 @@ function search_api_et_entity_update($entity, $entity_type) {
     }
   }
 
-  // Track the chances to all translations.
-  search_api_track_item_change($et_entity_type, $item_ids);
+  // Track the changes to all translations.
+  if (!empty($item_ids)) {
+    search_api_track_item_change($et_entity_type, $item_ids);
+  }
 }
 
 /**
